@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -167,14 +166,11 @@ bool isBlank(const string &text) {
 
 // Reads one line of input. Exits cleanly if the input stream is closed,
 // which would otherwise cause an endless loop in the input functions.
-string readLine(const string &prompt) {
+string readLine(string prompt) {
   cout << prompt;
 
   string input;
-  if (!getline(cin, input)) {
-    cout << "\nInput closed. Exiting program.\n";
-    exit(0);
-  }
+  getline(cin, input);
 
   return input;
 }
