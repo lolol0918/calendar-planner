@@ -239,6 +239,17 @@ void generateCalendar() {
   }
 }
 
+bool hasEvent(int day, int month, int year) {
+  for (int i = 0; i < eventCount; i++) {
+    if (events[i].day == day && events[i].month == month &&
+        events[i].year == year) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Prints the current month as a calendar grid.
 void displayCalendar() {
   string title = monthName(calendar.month) + " " + to_string(calendar.year);
@@ -261,12 +272,17 @@ void displayCalendar() {
     }
 
     for (int col = 0; col <= lastCol; col++) {
-      if (calendar.days[row][col] == 0) {
+      int day = calendar.days[row][col];
+
+      if (day == 0) {
         cout << "    ";
+      } else if (hasEvent(day, calendar.month, calendar.year)) {
+        cout << setw(3) << "*" << day;
       } else {
-        cout << setw(4) << calendar.days[row][col];
+        cout << setw(4) << day;
       }
     }
+
     cout << "\n";
   }
 }
