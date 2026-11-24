@@ -8,6 +8,14 @@ const int MAX_EVENTS = 100;
 const int MIN_YEAR = 1;
 const int MAX_YEAR = 9999;
 
+// ANSI escape code for clearing screen
+void clearScreen() { cout << "\033[H\033[2J\033[3J" << flush; }
+
+void pauseScreen() {
+  cout << "\n\nPress Enter to continue...";
+  cin.ignore();
+  cin.get();
+}
 // One event on the planner.
 struct Event {
   string title;
@@ -546,18 +554,18 @@ void displayUpcoming() {
 }
 
 void displayMenu() {
-  cout << "\nCALENDAR PLANNER\n";
-  cout << "================\n";
-  cout << " 1. View previous month\n";
-  cout << " 2. View next month\n";
-  cout << " 3. Add event\n";
-  cout << " 4. View events by date\n";
-  cout << " 5. Delete event\n";
-  cout << " 6. Undo delete\n";
-  cout << " 7. View upcoming events\n";
-  cout << " 8. Complete next event\n";
-  cout << " 9. Exit\n";
-  cout << "================\n";
+  cout << "\n";
+  cout << "========================================================\n";
+  cout << "                     NAVIGATION\n";
+  cout << "========================================================\n";
+
+  cout << "  [1] Previous Month       [2] Next Month\n";
+  cout << "  [3] Add Event            [4] View Events by Date\n";
+  cout << "  [5] Delete Event         [6] Undo Delete\n";
+  cout << "  [7] Upcoming Events      [8] Complete Next Event\n";
+  cout << "--------------------------------------------------------\n";
+  cout << "  [9] Exit\n";
+  cout << "========================================================\n";
 }
 
 int main() {
@@ -569,8 +577,11 @@ int main() {
   int choice;
 
   do {
+    clearScreen();
+
     displayCalendar();
     displayMenu();
+
     choice = readInt("Choice: ", 1, 9);
 
     switch (choice) {
@@ -582,21 +593,27 @@ int main() {
       break;
     case 3:
       addEvent();
+      pauseScreen();
       break;
     case 4:
       displayEvents();
+      pauseScreen();
       break;
     case 5:
       deleteEvent();
+      pauseScreen();
       break;
     case 6:
       undoDelete();
+      pauseScreen();
       break;
     case 7:
       displayUpcoming();
+      pauseScreen();
       break;
     case 8:
       dequeueUpcoming();
+      pauseScreen();
       break;
     case 9:
       cout << "Goodbye!\n";
