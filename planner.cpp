@@ -277,7 +277,7 @@ void displayCalendar() {
       if (day == 0) {
         cout << "    ";
       } else if (hasEvent(day, calendar.month, calendar.year)) {
-        cout << setw(3) << "*" << day;
+        cout << setw(4) << ("*" + to_string(day));
       } else {
         cout << setw(4) << day;
       }
