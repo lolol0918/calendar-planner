@@ -1,9 +1,15 @@
-#include <ctime>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 using namespace std;
 
+const int MAX_EVENTS = 100;
+const int MIN_YEAR = 1;
+const int MAX_YEAR = 9999;
+
+// One event on the planner.
 struct Event {
   string title;
   string description;
@@ -16,18 +22,26 @@ struct Event {
   int endMinute;
 };
 
+// The month currently shown on screen.
 struct Calendar {
   int days[6][7];
   int month;
   int year;
+  int startingDay; // weekday of the 1st: 0 = Sunday ... 6 = Saturday
 };
 
+// Returns true if the given year is a leap year.
 bool isLeapYear(int year) {
-  return (year % 400 == 0) or (year % 4 == 0 and year % 100 != 0);
+  return (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0);
 }
 
-int monthDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+const int monthDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+const string monthNames[] = {"January",   "February", "March",    "April",
+                             "May",       "June",     "July",     "August",
+                             "September", "October",  "November", "December"};
+
+// Returns how many days a month has, accounting for leap years.
 int daysInMonth(int month, int year) {
   if (month < 1 || month > 12) {
     return 0;
@@ -39,23 +53,30 @@ int daysInMonth(int month, int year) {
   return monthDays[month - 1];
 }
 
-// kung monday, tuesday, and so on gng.
+// Returns the name of a month, e.g. 12 -> "December".
+string monthName(int month) {
+  if (month < 1 || month > 12) {
+    return "Unknown";
+  }
+
+  return monthNames[month - 1];
+}
+
 int getStartingDay(int month, int year) {
-  std::tm date = {};
+  int monthOffset[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
 
-  date.tm_year = year - 1900;
-  date.tm_mon = month - 1;
-  date.tm_mday = 1;
-  date.tm_hour = 12;
+  if (month < 3) {
+    year--;
+  }
 
-  std::mktime(&date);
+  int day = year + year / 4 - year / 100 + year / 400;
+  day += monthOffset[month - 1] + 1;
 
-  return date.tm_wday;
+  return day % 7;
 }
 
 // GLOBAL variables
 Calendar calendar;
-const int MAX_EVENTS = 100;
 
 Event events[MAX_EVENTS];
 int eventCount = 0;
@@ -70,8 +91,136 @@ int queueFront = 0;
 int queueRear = -1;
 int queueCount = 0;
 
+// Converts a date to text, e.g. "December 5, 2026".
+string formatDate(int day, int month, int year) {
+  return monthName(month) + " " + to_string(day) + ", " + to_string(year);
+}
+
+// Same as formatDate, but takes the date from an event.
+string formatEventDate(const Event &event) {
+  return formatDate(event.day, event.month, event.year);
+}
+
+// Converts 24-hour time to text, e.g. (14, 5) -> "2:05 PM".
+string formatTime(int hour, int minute) {
+  string period;
+
+  if (hour < 12) {
+    period = "AM";
+  } else {
+    period = "PM";
+  }
+
+  int displayHour = hour % 12;
+
+  if (displayHour == 0) {
+    displayHour = 12;
+  }
+
+  string minuteText = to_string(minute);
+
+  if (minute < 10) {
+    minuteText = "0" + minuteText;
+  }
+
+  return to_string(displayHour) + ":" + minuteText + " " + period;
+}
+
+string formatTimeRange(const Event &event) {
+  return formatTime(event.startHour, event.startMinute) + " - " +
+         formatTime(event.endHour, event.endMinute);
+}
+
+// Converts a time to minutes after midnight, so two times can be compared.
+int toMinutes(int hour, int minute) { return hour * 60 + minute; }
+
+// Returns a number used to sort events by date and starting time.
+long long eventKey(const Event &event) {
+  long long date = event.year;
+
+  date = date * 100 + event.month;
+  date = date * 100 + event.day;
+
+  return date * 10000 + toMinutes(event.startHour, event.startMinute);
+}
+
+// Returns true if both events have the same title, date, and start time.
+bool isSameEvent(const Event &first, const Event &second) {
+  return first.title == second.title && eventKey(first) == eventKey(second);
+}
+
+// Returns true if the text is empty or contains only spaces.
+
+bool isBlank(const string &text) {
+  for (char c : text) {
+    if (c != ' ' && c != '\t') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// Input
+// ----------------------------------------------------------------------------
+
+// Reads one line of input. Exits cleanly if the input stream is closed,
+// which would otherwise cause an endless loop in the input functions.
+string readLine(const string &prompt) {
+  cout << prompt;
+
+  string input;
+  if (!getline(cin, input)) {
+    cout << "\nInput closed. Exiting program.\n";
+    exit(0);
+  }
+
+  return input;
+}
+
+// Keeps asking until the user enters a whole number between min and max.
+int readInt(const string &prompt, int minValue, int maxValue) {
+  while (true) {
+    stringstream stream(readLine(prompt));
+    int value;
+    char extra;
+
+    if ((stream >> value) && !(stream >> extra) && value >= minValue &&
+        value <= maxValue) {
+      return value;
+    }
+
+    cout << "Please enter a number from " << minValue << " to " << maxValue
+         << ".\n";
+  }
+}
+
+// Keeps asking until the day, month, and year form a real date.
+void readDate(int &day, int &month, int &year) {
+  while (true) {
+    day = readInt("Day (1-31): ", 1, 31);
+    month = readInt("Month (1-12): ", 1, 12);
+    year = readInt("Year: ", MIN_YEAR, MAX_YEAR);
+
+    int totalDays = daysInMonth(month, year);
+
+    if (day <= totalDays) {
+      return;
+    }
+
+    cout << monthName(month) << " " << year << " only has " << totalDays
+         << " days. Please try again.\n";
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Calendar
+// ----------------------------------------------------------------------------
+
+// Fills the 2D array with the day numbers of the current month.
 void generateCalendar() {
-  int startingDay = getStartingDay(calendar.month, calendar.year);
+  calendar.startingDay = getStartingDay(calendar.month, calendar.year);
   int totalDays = daysInMonth(calendar.month, calendar.year);
 
   // Clear the calendar first
@@ -83,7 +232,7 @@ void generateCalendar() {
 
   // Fill in the day numbers
   for (int day = 1; day <= totalDays; day++) {
-    int position = startingDay + day - 1;
+    int position = calendar.startingDay + day - 1;
 
     int row = position / 7;
     int col = position % 7;
@@ -92,38 +241,118 @@ void generateCalendar() {
   }
 }
 
+// Prints the current month as a calendar grid.
 void displayCalendar() {
-  cout << "\n       " << calendar.month << "/" << calendar.year << "\n\n";
+  string title = monthName(calendar.month) + " " + to_string(calendar.year);
+  int calendarWidth = 28;
+  int padding = (calendarWidth - static_cast<int>(title.length())) / 2;
+
+  cout << "\n";
+  cout << string(padding, ' ') << title << "\n\n";
 
   cout << " Sun Mon Tue Wed Thu Fri Sat\n";
 
-  for (int row = 0; row < 6; row++) {
-    for (int col = 0; col < 7; col++) {
+  int totalDays = daysInMonth(calendar.month, calendar.year);
+  int totalRows = (calendar.startingDay + totalDays + 6) / 7;
+
+  for (int row = 0; row < totalRows; row++) {
+    int lastCol = 6;
+
+    while (lastCol >= 0 && calendar.days[row][lastCol] == 0) {
+      lastCol--;
+    }
+
+    for (int col = 0; col <= lastCol; col++) {
       if (calendar.days[row][col] == 0) {
         cout << "    ";
       } else {
         cout << setw(4) << calendar.days[row][col];
       }
     }
-    cout << endl;
+    cout << "\n";
   }
 }
 
+// Moves the calendar one month back (-1) or forward (+1).
+// Stops at the first and last supported years.
 void changeMonth(int direction) {
-  calendar.month += direction;
+  int newMonth = calendar.month + direction;
+  int newYear = calendar.year;
 
-  if (calendar.month > 12) {
-    calendar.month = 1;
-    calendar.year++;
+  if (newMonth > 12) {
+    newMonth = 1;
+    newYear++;
+  } else if (newMonth < 1) {
+    newMonth = 12;
+    newYear--;
   }
 
-  if (calendar.month < 1) {
-    calendar.month = 12;
-    calendar.year--;
+  if (newYear < MIN_YEAR || newYear > MAX_YEAR) {
+    cout << "Cannot go beyond the years " << MIN_YEAR << " to " << MAX_YEAR
+         << ".\n";
+    return;
   }
+
+  calendar.month = newMonth;
+  calendar.year = newYear;
 
   generateCalendar();
 }
+
+// ----------------------------------------------------------------------------
+// Event list and upcoming queue
+// ----------------------------------------------------------------------------
+
+// Adds an event to the back of the upcoming queue.
+void enqueueUpcoming(const Event &event) {
+  if (queueCount == MAX_EVENTS) {
+    cout << "Upcoming events queue is full.\n";
+    return;
+  }
+
+  queueRear = (queueRear + 1) % MAX_EVENTS;
+  upcomingEvents[queueRear] = event;
+  queueCount++;
+}
+
+// Refills the upcoming queue from events[]. Since events[] is always sorted,
+// the queue ends up in chronological order. Called whenever events[] changes.
+void rebuildUpcoming() {
+  queueFront = 0;
+  queueRear = -1;
+  queueCount = 0;
+
+  for (int i = 0; i < eventCount; i++) {
+    enqueueUpcoming(events[i]);
+  }
+}
+
+// Inserts an event at its chronological position in events[].
+// The caller must make sure the array is not full.
+void insertSorted(const Event &event) {
+  int position = eventCount;
+
+  while (position > 0 && eventKey(events[position - 1]) > eventKey(event)) {
+    events[position] = events[position - 1];
+    position--;
+  }
+
+  events[position] = event;
+  eventCount++;
+}
+
+// Removes the event at the given index and closes the gap.
+void removeEventAt(int index) {
+  for (int i = index; i < eventCount - 1; i++) {
+    events[i] = events[i + 1];
+  }
+
+  eventCount--;
+}
+
+// ----------------------------------------------------------------------------
+// Menu actions
+// ----------------------------------------------------------------------------
 
 void addEvent() {
   if (eventCount >= MAX_EVENTS) {
@@ -133,45 +362,46 @@ void addEvent() {
 
   Event newEvent;
 
-  cin.ignore(10000, '\n');
+  cout << "\nAdd Event\n";
+  cout << "---------\n";
 
-  cout << "\nEvent title: ";
-  getline(cin, newEvent.title);
+  // A title is required
+  while (true) {
+    newEvent.title = readLine("Title: ");
 
-  cout << "Description: ";
-  getline(cin, newEvent.description);
+    if (!isBlank(newEvent.title)) {
+      break;
+    }
 
-  cout << "Day: ";
-  cin >> newEvent.day;
-
-  cout << "Month: ";
-  cin >> newEvent.month;
-
-  cout << "Year: ";
-  cin >> newEvent.year;
-
-  if (newEvent.month < 1 || newEvent.month > 12 || newEvent.day < 1 ||
-      newEvent.day > daysInMonth(newEvent.month, newEvent.year)) {
-    cout << "Invalid date!\n";
-    return;
+    cout << "The title cannot be empty.\n";
   }
 
-  cout << "Start hour (0-23): ";
-  cin >> newEvent.startHour;
+  newEvent.description = readLine("Description: ");
 
-  cout << "Start minute (0-59): ";
-  cin >> newEvent.startMinute;
+  readDate(newEvent.day, newEvent.month, newEvent.year);
 
-  cout << "End hour (0-23): ";
-  cin >> newEvent.endHour;
+  newEvent.startHour = readInt("Start hour (0-23): ", 0, 23);
+  newEvent.startMinute = readInt("Start minute (0-59): ", 0, 59);
 
-  cout << "End minute (0-59): ";
-  cin >> newEvent.endMinute;
+  // The event must end after it starts
+  while (true) {
+    newEvent.endHour = readInt("End hour (0-23): ", 0, 23);
+    newEvent.endMinute = readInt("End minute (0-59): ", 0, 59);
 
-  events[eventCount] = newEvent;
-  eventCount++;
+    if (toMinutes(newEvent.endHour, newEvent.endMinute) >
+        toMinutes(newEvent.startHour, newEvent.startMinute)) {
+      break;
+    }
 
-  cout << "Event added successfully!\n";
+    cout << "The end time must be later than the start time.\n";
+  }
+
+  insertSorted(newEvent);
+  rebuildUpcoming();
+
+  cout << "\nEvent added: " << newEvent.title << "\n";
+  cout << "  " << formatEventDate(newEvent);
+  cout << ", " << formatTimeRange(newEvent) << "\n";
 }
 
 void deleteEvent() {
@@ -180,35 +410,36 @@ void deleteEvent() {
     return;
   }
 
-  for (int i = 0; i < eventCount; i++) {
-    cout << i + 1 << ". " << events[i].title << " (" << events[i].day << "/"
-         << events[i].month << "/" << events[i].year << ")\n";
-  }
-
-  int choice;
-
-  cout << "Choose event to delete: ";
-  cin >> choice;
-
-  if (choice < 1 || choice > eventCount) {
-    cout << "Invalid choice.\n";
-    return;
-  }
-
   if (stackTop == MAX_EVENTS - 1) {
     cout << "Undo stack is full. Cannot delete.\n";
     return;
   }
 
-  deletedEvents[++stackTop] = events[choice - 1];
+  cout << "\nDelete Event\n";
+  cout << "------------\n";
 
-  for (int i = choice - 1; i < eventCount - 1; i++) {
-    events[i] = events[i + 1];
+  for (int i = 0; i < eventCount; i++) {
+    cout << " " << i + 1 << ". " << events[i].title << " - "
+         << formatEventDate(events[i]) << "\n";
   }
 
-  eventCount--;
+  int choice =
+      readInt("\nChoose event to delete (0 to cancel): ", 0, eventCount);
 
-  cout << "Event deleted. You can undo this action.\n";
+  if (choice == 0) {
+    cout << "Deletion cancelled.\n";
+    return;
+  }
+
+  // Save the event on the stack so the deletion can be undone
+  deletedEvents[++stackTop] = events[choice - 1];
+
+  removeEventAt(choice - 1);
+  rebuildUpcoming();
+
+  cout << "\nDeleted \"" << deletedEvents[stackTop].title << "\" ("
+       << formatEventDate(deletedEvents[stackTop]) << ").\n";
+  cout << "You can undo this from the main menu.\n";
 }
 
 void undoDelete() {
@@ -222,12 +453,14 @@ void undoDelete() {
     return;
   }
 
-  events[eventCount] = deletedEvents[stackTop];
-  eventCount++;
+  // Pop the last deleted event and put it back in its chronological spot
+  Event restored = deletedEvents[stackTop--];
 
-  stackTop--;
+  insertSorted(restored);
+  rebuildUpcoming();
 
-  cout << "Last deleted event restored!\n";
+  cout << "Restored \"" << restored.title << "\" (" << formatEventDate(restored)
+       << ").\n";
 }
 
 void displayEvents() {
@@ -238,58 +471,64 @@ void displayEvents() {
 
   int day, month, year;
 
-  cout << "Enter day: ";
-  cin >> day;
+  cout << "\nView Events by Date\n";
+  cout << "-------------------\n";
 
-  cout << "Enter month: ";
-  cin >> month;
+  readDate(day, month, year);
 
-  cout << "Enter year: ";
-  cin >> year;
-
+  string heading = "Events on " + formatDate(day, month, year);
   bool found = false;
 
   for (int i = 0; i < eventCount; i++) {
     if (events[i].day == day && events[i].month == month &&
         events[i].year == year) {
+      if (!found) {
+        cout << "\n" << heading << "\n";
+        cout << string(heading.length(), '-') << "\n";
+      }
 
-      cout << "\nTitle: " << events[i].title;
-      cout << "\nDescription: " << events[i].description;
-      cout << "\nStart: " << events[i].startHour << ":"
-           << events[i].startMinute;
-      cout << "\nEnd: " << events[i].endHour << ":" << events[i].endMinute
-           << "\n";
+      cout << "\n" << events[i].title << "\n";
+
+      if (!events[i].description.empty()) {
+        cout << "  " << events[i].description << "\n";
+      }
+
+      cout << "  " << formatTimeRange(events[i]) << "\n";
 
       found = true;
     }
   }
 
   if (!found) {
-    cout << "No events found for that date.\n";
+    cout << "No events found for " << formatDate(day, month, year) << ".\n";
   }
 }
 
-void enqueueUpcoming(Event event) {
-  if (queueCount == MAX_EVENTS) {
-    cout << "Upcoming events queue is full.\n";
-    return;
-  }
-
-  queueRear = (queueRear + 1) % MAX_EVENTS;
-  upcomingEvents[queueRear] = event;
-  queueCount++;
-}
-
+// Takes the earliest event off the queue and marks it as completed.
+// A completed event is also removed from the event list.
 void dequeueUpcoming() {
   if (queueCount == 0) {
     cout << "No upcoming events.\n";
     return;
   }
 
-  cout << "Next event: " << upcomingEvents[queueFront].title << "\n";
+  Event nextEvent = upcomingEvents[queueFront];
+
+  cout << "Next event: " << nextEvent.title << "\n";
+  cout << "  " << formatEventDate(nextEvent);
+  cout << ", " << formatTimeRange(nextEvent) << "\n";
 
   queueFront = (queueFront + 1) % MAX_EVENTS;
   queueCount--;
+
+  for (int i = 0; i < eventCount; i++) {
+    if (isSameEvent(events[i], nextEvent)) {
+      removeEventAt(i);
+      break;
+    }
+  }
+
+  cout << "Event completed.\n";
 }
 
 void displayUpcoming() {
@@ -298,13 +537,31 @@ void displayUpcoming() {
     return;
   }
 
-  cout << "\nUpcoming Events:\n";
+  cout << "\nUpcoming Events\n";
+  cout << "---------------\n";
 
   for (int i = 0; i < queueCount; i++) {
     int index = (queueFront + i) % MAX_EVENTS;
 
-    cout << upcomingEvents[index].title << "\n";
+    cout << " " << i + 1 << ". " << upcomingEvents[index].title << "\n";
+    cout << "    " << formatEventDate(upcomingEvents[index]) << ", "
+         << formatTimeRange(upcomingEvents[index]) << "\n";
   }
+}
+
+void displayMenu() {
+  cout << "\nCALENDAR PLANNER\n";
+  cout << "================\n";
+  cout << " 1. View previous month\n";
+  cout << " 2. View next month\n";
+  cout << " 3. Add event\n";
+  cout << " 4. View events by date\n";
+  cout << " 5. Delete event\n";
+  cout << " 6. Undo delete\n";
+  cout << " 7. View upcoming events\n";
+  cout << " 8. Complete next event\n";
+  cout << " 9. Exit\n";
+  cout << "================\n";
 }
 
 int main() {
@@ -316,67 +573,41 @@ int main() {
   int choice;
 
   do {
-    cout << "\n==============================\n";
-    cout << "       CALENDAR PLANNER       \n";
-    cout << "==============================\n";
-    cout << "1. Display Calendar\n";
-    cout << "2. Previous Month\n";
-    cout << "3. Next Month\n";
-    cout << "4. Add Event\n";
-    cout << "5. View Events\n";
-    cout << "6. Delete Event\n";
-    cout << "7. Undo Delete\n";
-    cout << "8. View Upcoming Events\n";
-    cout << "9. Process Next Upcoming Event\n";
-    cout << "10. Exit\n";
-    cout << "==============================\n";
-    cout << "Choose: ";
-
-    if (!(cin >> choice)) {
-      cin.clear();
-      cin.ignore(10000, '\n');
-      cout << "Invalid input.\n";
-      continue;
-    }
+    displayCalendar();
+    displayMenu();
+    choice = readInt("Choice: ", 1, 9);
 
     switch (choice) {
     case 1:
-      displayCalendar();
+      changeMonth(-1);
       break;
     case 2:
-      changeMonth(-1);
-      displayCalendar();
+      changeMonth(1);
       break;
     case 3:
-      changeMonth(1);
-      displayCalendar();
-      break;
-    case 4:
       addEvent();
       break;
-    case 5:
+    case 4:
       displayEvents();
       break;
-    case 6:
+    case 5:
       deleteEvent();
       break;
-    case 7:
+    case 6:
       undoDelete();
       break;
-    case 8:
+    case 7:
       displayUpcoming();
       break;
-    case 9:
+    case 8:
       dequeueUpcoming();
       break;
-    case 10:
+    case 9:
       cout << "Goodbye!\n";
       break;
-    default:
-      cout << "Invalid choice.\n";
     }
 
-  } while (choice != 10);
+  } while (choice != 9);
 
   return 0;
 }
