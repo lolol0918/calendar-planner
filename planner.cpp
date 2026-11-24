@@ -555,13 +555,13 @@ void displayUpcoming() {
 void displayMenu() {
   cout << "\n";
   cout << "========================================================\n";
-  cout << "                     NAVIGATION\n";
+  cout << "                         <MENU>\n";
   cout << "========================================================\n";
 
-  cout << "  [1] Previous Month       [2] Next Month\n";
-  cout << "  [3] Add Event            [4] View Events by Date\n";
-  cout << "  [5] Delete Event         [6] Undo Delete\n";
-  cout << "  [7] Upcoming Events      [8] Complete Next Event\n";
+  cout << "  [1] Previous Month         [5] Delete Event\n";
+  cout << "  [2] Next Month             [6] Undo Delete\n";
+  cout << "  [3] Add Event              [7] Upcoming Events\n";
+  cout << "  [4] View Events by Date    [8] Complete Next Event\n";
   cout << "--------------------------------------------------------\n";
   cout << "  [9] Exit\n";
   cout << "========================================================\n";
@@ -615,7 +615,7 @@ int main() {
       pauseScreen();
       break;
     case 9:
-      cout << "Goodbye!\n";
+      cout << "THANK YOU FOR USING THE PROGRAM!\n";
       break;
     }
 
