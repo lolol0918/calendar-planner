@@ -13,7 +13,6 @@ void clearScreen() { cout << "\033[H\033[2J\033[3J" << flush; }
 
 void pauseScreen() {
   cout << "\n\nPress Enter to continue...";
-  cin.ignore();
   cin.get();
 }
 // One event on the planner.
