@@ -1,6 +1,8 @@
 #include <iomanip>
 #include <iostream>
+#include <queue>
 #include <sstream>
+#include <stack>
 #include <string>
 using namespace std;
 
@@ -87,15 +89,8 @@ Calendar calendar;
 Event events[MAX_EVENTS];
 int eventCount = 0;
 
-// Stack for deleted events
-Event deletedEvents[MAX_EVENTS];
-int stackTop = -1;
-
-// Queue for upcoming events
-Event upcomingEvents[MAX_EVENTS];
-int queueFront = 0;
-int queueRear = -1;
-int queueCount = 0;
+stack<Event> deletedEvents;
+queue<Event> upcomingEvents;
 
 // Converts a date to text, e.g. "December 5, 2026".
 string formatDate(int day, int month, int year) {
@@ -308,22 +303,18 @@ void changeMonth(int direction) {
 
 // Adds an event to the back of the upcoming queue.
 void enqueueUpcoming(const Event &event) {
-  if (queueCount == MAX_EVENTS) {
+  if (upcomingEvents.size() == MAX_EVENTS) {
     cout << "Upcoming events queue is full.\n";
     return;
   }
 
-  queueRear = (queueRear + 1) % MAX_EVENTS;
-  upcomingEvents[queueRear] = event;
-  queueCount++;
+  upcomingEvents.push(event);
 }
 
 // Refills the upcoming queue from events[]. Since events[] is always sorted,
 // the queue ends up in chronological order. Called whenever events[] changes.
 void rebuildUpcoming() {
-  queueFront = 0;
-  queueRear = -1;
-  queueCount = 0;
+  upcomingEvents = queue<Event>();
 
   for (int i = 0; i < eventCount; i++) {
     enqueueUpcoming(events[i]);
@@ -413,7 +404,7 @@ void deleteEvent() {
     return;
   }
 
-  if (stackTop == MAX_EVENTS - 1) {
+  if (deletedEvents.size() == MAX_EVENTS) {
     cout << "Undo stack is full. Cannot delete.\n";
     return;
   }
@@ -435,18 +426,18 @@ void deleteEvent() {
   }
 
   // Save the event on the stack so the deletion can be undone
-  deletedEvents[++stackTop] = events[choice - 1];
+  deletedEvents.push(events[choice - 1]);
 
   removeEventAt(choice - 1);
   rebuildUpcoming();
 
-  cout << "\nDeleted \"" << deletedEvents[stackTop].title << "\" ("
-       << formatEventDate(deletedEvents[stackTop]) << ").\n";
+  cout << "\nDeleted \"" << deletedEvents.top().title << "\" ("
+       << formatEventDate(deletedEvents.top()) << ").\n";
   cout << "You can undo this from the main menu.\n";
 }
 
 void undoDelete() {
-  if (stackTop == -1) {
+  if (deletedEvents.empty()) {
     cout << "Nothing to undo.\n";
     return;
   }
@@ -457,7 +448,8 @@ void undoDelete() {
   }
 
   // Pop the last deleted event and put it back in its chronological spot
-  Event restored = deletedEvents[stackTop--];
+  Event restored = deletedEvents.top();
+  deletedEvents.pop();
 
   insertSorted(restored);
   rebuildUpcoming();
@@ -510,19 +502,18 @@ void displayEvents() {
 // Takes the earliest event off the queue and marks it as completed.
 // A completed event is also removed from the event list.
 void dequeueUpcoming() {
-  if (queueCount == 0) {
+  if (upcomingEvents.empty()) {
     cout << "No upcoming events.\n";
     return;
   }
 
-  Event nextEvent = upcomingEvents[queueFront];
+  Event nextEvent = upcomingEvents.front();
 
   cout << "Next event: " << nextEvent.title << "\n";
   cout << "  " << formatEventDate(nextEvent);
   cout << ", " << formatTimeRange(nextEvent) << "\n";
 
-  queueFront = (queueFront + 1) % MAX_EVENTS;
-  queueCount--;
+  upcomingEvents.pop();
 
   for (int i = 0; i < eventCount; i++) {
     if (isSameEvent(events[i], nextEvent)) {
@@ -535,7 +526,7 @@ void dequeueUpcoming() {
 }
 
 void displayUpcoming() {
-  if (queueCount == 0) {
+  if (upcomingEvents.empty()) {
     cout << "No upcoming events.\n";
     return;
   }
@@ -543,12 +534,16 @@ void displayUpcoming() {
   cout << "\nUpcoming Events\n";
   cout << "---------------\n";
 
-  for (int i = 0; i < queueCount; i++) {
-    int index = (queueFront + i) % MAX_EVENTS;
+  queue<Event> remaining = upcomingEvents;
 
-    cout << " " << i + 1 << ". " << upcomingEvents[index].title << "\n";
-    cout << "    " << formatEventDate(upcomingEvents[index]) << ", "
-         << formatTimeRange(upcomingEvents[index]) << "\n";
+  for (int i = 0; !remaining.empty(); i++) {
+    Event event = remaining.front();
+
+    cout << " " << i + 1 << ". " << event.title << "\n";
+    cout << "    " << formatEventDate(event) << ", " << formatTimeRange(event)
+         << "\n";
+
+    remaining.pop();
   }
 }
 
